@@ -65,8 +65,10 @@ if (-not (Test-Path $cygBash)) { throw 'Cygwin bash missing after setup' }
 
 # Cygwin script for invoking Ant 1.9 with the Java 6 bootstrap, without
 # accidentally choosing newer Ant / Java from the host image PATH.
-$localBin = Join-Path $cygRoot 'usr\local\bin'
+# Keep the wrapper in the workspace, not under a guessed Cygwin mount path.
+$localBin = Join-Path $work 'cygwin-tools'
 New-Item -ItemType Directory -Force $localBin | Out-Null
+$antWrapperPath = Join-Path $localBin 'ant'
 $antWrapper = @'
 #!/usr/bin/env bash
 set -e
@@ -74,8 +76,8 @@ bootstrap="$(cygpath -u "$BOOT_JDK_DIR")"
 ant_home="$(cygpath -u "$LEGACY_ANT_HOME")"
 exec "$bootstrap/bin/java" -cp "$ant_home/lib/ant-launcher.jar" org.apache.tools.ant.launch.Launcher "$@"
 '@
-[System.IO.File]::WriteAllText((Join-Path $localBin 'ant'), ($antWrapper + "`n"), (New-Object System.Text.UTF8Encoding $false))
-& $cygBash --noprofile --norc -c 'chmod +x /usr/local/bin/ant'
+[System.IO.File]::WriteAllText($antWrapperPath, ($antWrapper + "`n"), (New-Object System.Text.UTF8Encoding $false))
+& $cygBash --noprofile --norc -c 'path=$(cygpath -u "$1") && chmod +x "$path" && test -x "$path"' -- $antWrapperPath
 if ($LASTEXITCODE -ne 0) { throw 'Failed to enable Cygwin Ant wrapper' }
 
 # Select installed Visual Studio C++ tools; on hosted runners this is VS2022.

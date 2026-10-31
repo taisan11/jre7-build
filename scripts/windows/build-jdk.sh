@@ -28,7 +28,7 @@ export LANG=C LC_ALL=C
 unset JAVA_HOME CLASSPATH JAVA_TOOL_OPTIONS _JAVA_OPTIONS || true
 
 # Avoid Git-for-Windows GNU utilities and newer host Java/Ant.
-export PATH="/usr/local/bin:/usr/bin:/bin:${PATH}"
+export PATH="$repo/work/cygwin-tools:/usr/local/bin:/usr/bin:/bin:${PATH}"
 
 set -o pipefail
 {
