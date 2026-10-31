@@ -12,9 +12,18 @@ ca_hash_file="$(realpath "${7:?CA SHA256 file missing}")"
 
 jdk_path_file="$out/jdk-image-path.txt"
 [[ -f "$jdk_path_file" ]] || { echo 'No JDK build output location' >&2; exit 1; }
-jdk="$(cat "$jdk_path_file")"
+jdk_relative="$(cat "$jdk_path_file")"
+[[ -n "$jdk_relative" && "$jdk_relative" != /* ]] || {
+  echo "Invalid source-relative JDK image path: $jdk_relative" >&2
+  exit 1
+}
+jdk="$(realpath -m "$src/$jdk_relative")"
+[[ "$jdk" == "$src/"* ]] || {
+  echo "JDK image path escapes source tree: $jdk_relative" >&2
+  exit 1
+}
 [[ -d "$jdk/jre" && -x "$jdk/bin/keytool" && -x "$jdk/jre/bin/java" ]] || {
-  echo 'Incomplete JDK build output: missing JRE, keytool or java executable' >&2
+  echo "Incomplete JDK build output at $jdk: missing JRE, keytool or java executable" >&2
   exit 1
 }
 

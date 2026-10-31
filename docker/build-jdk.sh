@@ -49,4 +49,5 @@ mkdir -p /tmp/java7-smoke
 "$jdk_image/bin/java" -Djava.awt.headless=true -cp /tmp/java7-smoke SmokeTest
 "$jdk_image/bin/java" -version
 
-echo "$jdk_image" > "$out/jdk-image-path.txt"
+# Container paths are not valid on the host; record a source-relative path.
+printf '%s\n' "${jdk_image#"$src"/}" > "$out/jdk-image-path.txt"
