@@ -74,10 +74,11 @@ $antWrapper = @'
 set -e
 bootstrap="$(cygpath -u "$BOOT_JDK_DIR")"
 ant_home="$(cygpath -u "$LEGACY_ANT_HOME")"
-exec "$bootstrap/bin/java" -cp "$ant_home/lib/ant-launcher.jar" org.apache.tools.ant.launch.Launcher "$@"
+exec "$bootstrap/bin/java" -cp "$(cygpath -w "$ant_home/lib/ant-launcher.jar")" org.apache.tools.ant.launch.Launcher "$@"
 '@
-[System.IO.File]::WriteAllText($antWrapperPath, ($antWrapper + "`n"), (New-Object System.Text.UTF8Encoding $false))
-& $cygBash --noprofile --norc -c 'path=$(cygpath -u "$1") && chmod +x "$path" && test -x "$path"' -- $antWrapperPath
+[System.IO.File]::WriteAllText($antWrapperPath, (($antWrapper -replace "`r`n", "`n") + "`n"), (New-Object System.Text.UTF8Encoding $false))
+# Use this Cygwin installation's tools, not Git for Windows or another PATH entry.
+& $cygBash --noprofile --norc -c 'export PATH=/usr/bin:/bin; set -e; path=$(cygpath -u "$1"); echo "Ant wrapper: $path"; command -v chmod; chmod +x "$path"; ls -l "$path"; if ! test -x "$path"; then echo "Ant wrapper is not executable under Cygwin" >&2; exit 1; fi' -- $antWrapperPath
 if ($LASTEXITCODE -ne 0) { throw 'Failed to enable Cygwin Ant wrapper' }
 
 # Select installed Visual Studio C++ tools; on hosted runners this is VS2022.
