@@ -104,10 +104,34 @@ try {
     if ($sdkProcess.ExitCode -ne 0) { throw "Windows SDK installer exited $($sdkProcess.ExitCode); see SDK setup logs on the runner" }
 } finally {
     if ($mounted) { Dismount-DiskImage -ImagePath $sdkIso | Out-Null }
+    # The bootstrapper can exit successfully even when individual components
+    # fail. Preserve the SDK's own logs for the Actions diagnostics artifact.
+    $sdkLogDir = Join-Path $work 'logs\sdk-setup'
+    New-Item -ItemType Directory -Force $sdkLogDir | Out-Null
+    Get-ChildItem -Path $env:TEMP -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like 'SDKSetup*.log' -or $_.Name -like '*Windows SDK*_SFX.log' } |
+        Copy-Item -Destination $sdkLogDir -Force
 }
 $sdkDir = Join-Path ${env:ProgramFiles} 'Microsoft SDKs\Windows\v7.1'
 $setEnv = Join-Path $sdkDir 'Bin\SetEnv.cmd'
 if (-not (Test-Path $setEnv)) { throw "Windows SDK 7.1 SetEnv.cmd missing: $setEnv; SDK installation may have silently failed" }
+# SetEnv.cmd can exist even when the x64 compiler component was omitted.
+# Check the initialized environment itself rather than assuming a layout.
+$probe = Join-Path $work 'probe-sdk.cmd'
+@"
+@echo off
+set "VCINSTALLDIR="
+set "VSINSTALLDIR="
+set "VSLANG=1033"
+call "$setEnv" /x64 /release
+if errorlevel 1 exit /b 1
+cl.exe 2>&1 | findstr /R /C:"Version 16\.00\." >nul
+exit /b %ERRORLEVEL%
+"@ | Set-Content -Path $probe -Encoding ascii
+& $env:ComSpec /d /c $probe
+if ($LASTEXITCODE -ne 0) {
+    throw 'Windows SDK 7.1 x64 compiler is missing or unusable; inspect windows-x64-diagnostics/sdk-setup logs'
+}
 "WINDOWSSDKDIR=$sdkDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 "SDK_SETENV=$setEnv" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
