@@ -42,8 +42,18 @@ jobs:
           sha256sum work/cacert.pem | tee work/cacert.sha256
           python3 scripts/cacerts.py --bundle work/cacert.pem --check-only
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Create legacy toolchain image (Ubuntu 14.04 / JDK 6 / GCC 4.8)
-        run: docker build --pull --tag legacy-jdk7-build:local docker
+        uses: docker/build-push-action@v6
+        with:
+          context: docker
+          tags: legacy-jdk7-build:local
+          pull: true
+          load: true
+          cache-from: type=gha,scope=legacy-jdk7-toolchain
+          cache-to: type=gha,mode=max,scope=legacy-jdk7-toolchain
 
       - name: Build JDK 7 and smoke-test VM
         run: |
@@ -52,7 +62,7 @@ jobs:
             --volume "$PWD/work/openjdk:/work/openjdk" \
             --volume "$PWD/tests:/work/tests:ro" \
             --volume "$PWD/out:/work/out" \
-            --env BUILD_JOBS=2 \
+            --env BUILD_JOBS=1 \
             legacy-jdk7-build:local \
             /bin/bash /opt/build-jdk.sh
 

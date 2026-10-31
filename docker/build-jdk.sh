@@ -16,8 +16,9 @@ export ALT_BOOTDIR="$boot"
 export ALT_FREETYPE_HEADERS_PATH=/usr/include/freetype2
 export ALT_FREETYPE_LIB_PATH=/usr/lib/x86_64-linux-gnu
 export CC=/usr/bin/gcc-4.8 CXX=/usr/bin/g++-4.8
-export HOTSPOT_BUILD_JOBS="${BUILD_JOBS:-2}"
-export PARALLEL_COMPILE_JOBS="${BUILD_JOBS:-2}"
+# The legacy CORBA makefiles can package classes before compilation with -j2.
+export HOTSPOT_BUILD_JOBS="${BUILD_JOBS:-1}"
+export PARALLEL_COMPILE_JOBS="${BUILD_JOBS:-1}"
 export NO_DOCS=true
 
 mkdir -p "$out"
@@ -33,7 +34,7 @@ echo '== Building OpenJDK 7u =='
 # No network downloads from the old Ant build system. JAXP/JAXWS sources are
 # already present in the consolidated OpenJDK Git repository.
 make sanity ALT_BOOTDIR="$ALT_BOOTDIR"
-make -j"${BUILD_JOBS:-2}" all ALLOW_DOWNLOADS=false \
+make -j"${BUILD_JOBS:-1}" all ALLOW_DOWNLOADS=false \
   ALT_BOOTDIR="$ALT_BOOTDIR" HOTSPOT_BUILD_JOBS="$HOTSPOT_BUILD_JOBS"
 
 jdk_image="$(find "$src/build" -type d -name j2sdk-image -print -quit)"

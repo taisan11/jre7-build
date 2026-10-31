@@ -15,6 +15,12 @@ bash scripts/package.sh work/openjdk out work/cacert.pem \
   jdk7u351-ga local local work/cacert.sha256
 ```
 
+Local Docker builds reuse Docker's layer cache. In GitHub Actions, the Linux
+build uses the GitHub Actions cache for the toolchain image layers and loads
+the image into Docker before running it. Changes to the Dockerfile, its build
+context, or the pulled base image can invalidate cached layers. The OpenJDK
+build itself is not cached.
+
 This is a best-effort legacy toolchain recipe; do not assume it builds
 successfully without running it. Avoid running the EOL build container as root
 with additional host privileges or binding sensitive directories.
