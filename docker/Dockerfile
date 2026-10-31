@@ -6,12 +6,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C \
     LC_ALL=C
 
-# Ubuntu 14.04 is EOL; packages are retained on old-releases. Do not disable
-# apt signature verification. If the repository becomes unavailable, fail closed.
+# Trusty packages are currently hosted on the main Ubuntu archive, not
+# old-releases. Keep apt signature verification enabled.
 RUN printf '%s\n' \
-      'deb http://old-releases.ubuntu.com/ubuntu/ trusty main restricted universe multiverse' \
-      'deb http://old-releases.ubuntu.com/ubuntu/ trusty-updates main restricted universe multiverse' \
-      'deb http://old-releases.ubuntu.com/ubuntu/ trusty-security main restricted universe multiverse' \
+      'deb http://archive.ubuntu.com/ubuntu/ trusty main restricted universe multiverse' \
+      'deb http://archive.ubuntu.com/ubuntu/ trusty-updates main restricted universe multiverse' \
+      'deb http://archive.ubuntu.com/ubuntu/ trusty-security main restricted universe multiverse' \
       > /etc/apt/sources.list \
  && apt-get -o Acquire::Check-Valid-Until=false update \
  && apt-get install -y --no-install-recommends \
