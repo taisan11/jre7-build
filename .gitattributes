@@ -1,0 +1,2 @@
+# Cygwin Bash requires LF line endings, including on Windows checkouts.
+*.sh text eol=lf
