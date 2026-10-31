@@ -1,0 +1,87 @@
+name: Build legacy OpenJDK 7
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jre7-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-x64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check scripts and metadata
+        run: |
+          for f in scripts/*.sh docker/*.sh; do bash -n "$f"; done
+          python3 -m compileall -q scripts tests
+          python3 -m unittest discover -s tests -v
+
+      - name: Clone pinned upstream OpenJDK 7u
+        env:
+          OPENJDK_REF: jdk7u351-ga
+        run: |
+          bash scripts/fetch-source.sh "$OPENJDK_REF"
+          bash scripts/apply-patches.sh work/openjdk
+
+      - name: Fetch Mozilla root CA bundle (curl project)
+        run: |
+          mkdir -p work
+          curl --fail --location --show-error --silent --retry 3 \
+            https://curl.se/ca/cacert.pem -o work/cacert.pem
+          sha256sum work/cacert.pem | tee work/cacert.sha256
+          python3 scripts/cacerts.py --bundle work/cacert.pem --check-only
+
+      - name: Create legacy toolchain image (Ubuntu 14.04 / JDK 6 / GCC 4.8)
+        run: docker build --pull --tag legacy-jdk7-build:local docker
+
+      - name: Build JDK 7 and smoke-test VM
+        run: |
+          mkdir -p out
+          docker run --rm \
+            --volume "$PWD/work/openjdk:/work/openjdk" \
+            --volume "$PWD/tests:/work/tests:ro" \
+            --volume "$PWD/out:/work/out" \
+            --env BUILD_JOBS=2 \
+            legacy-jdk7-build:local \
+            /bin/bash /opt/build-jdk.sh
+
+      - name: Assemble JRE and JDK; refresh Java 7 cacerts
+        run: |
+          bash scripts/package.sh \
+            work/openjdk out work/cacert.pem \
+            jdk7u351-ga "${GITHUB_SHA}" "${GITHUB_RUN_ID}" \
+            work/cacert.sha256
+          ls -lah out/*.zip out/*.sha256
+
+      - name: Upload ZIP archives and checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-openjdk7u351-linux-x64
+          path: |
+            out/*.zip
+            out/*.sha256
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Publish release for tags only
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" out/*.zip out/*.sha256 \
+            --title "Legacy OpenJDK 7u351 - $GITHUB_REF_NAME" \
+            --notes "Community experimental build for legacy applications. Base: OpenJDK 7u351; Mozilla CA bundle refreshed at build time. NOT a fully patched or security-supported Java runtime. Linux x86_64 only."
+    permissions:
+      contents: write

@@ -1,0 +1,53 @@
+# Windows x64 / GitHub-hosted Actions (experimental)
+
+`Build legacy OpenJDK 7 (Windows x64 experiment)` is a **separate manual
+workflow**, so the original Linux builder is not modified or disabled.
+
+## Run
+
+1. Push this repository folder to GitHub.
+2. Actions → **Build legacy OpenJDK 7 (Windows x64 experiment)** → Run workflow.
+3. Inspect `windows-x64`. If all native build steps succeed, download the
+   `legacy-openjdk7u351-windows-x64` artifact containing two ZIPs and SHA256
+   checksums. Otherwise, download `windows-x64-diagnostics` and use the first
+   native toolchain error to guide a patch.
+
+## What the workflow does
+
+- Downloads OpenJDK 7u351 from `openjdk/jdk7u`.
+- Applies repository patch files under `patches/build/` and `patches/security/`.
+- Downloads Azul Zulu JDK **6** (Windows x64 ZIP) strictly as the compiler
+  bootstrap. This Java 6 build is never shipped with the output.
+- Installs Cygwin, GNU Make and older **Ant 1.9.16**, which can run on JDK 6.
+- Runs legacy Makefiles with the preinstalled Windows 2022 runner's MSVC x64
+  toolchain, records diagnostic logs, and *fails* if compilation fails.
+- Only if a complete `j2sdk-image` exists, runs `SmokeTest.java`, updates JKS
+  `cacerts` using the resulting Java 7 `keytool`, and packages JRE/JDK ZIPs.
+
+## Blocking issue: Visual Studio 2010 vs 2022
+
+**Upstream Java 7u351 expects MSVC 2010 (v100), but GitHub's `windows-2022`
+runner has MSVC 2022 (v143).** This workflow can execute the build steps on a
+GitHub-hosted runner, but is not known to successfully compile unpatched source.
+The source may need substantial toolchain/backport compatibility patches.
+Do not mistake a valid workflow YAML for a successfully ported Windows JVM.
+
+The source may also assume an older DirectX SDK, `make` and MSVC runtime.
+The automated setup does not acquire/provision VS2010 or an old DirectX SDK,
+and it does not redistribute proprietary Microsoft files. If the build fails,
+add only reviewed, legally distributable changes under `patches/build/`.
+
+The job is deliberately **workflow_dispatch-only** until a complete Windows
+build has been produced and tested; this avoids repeatedly failing every push.
+The existing Linux tag release job still only publishes Linux binaries.
+
+## Key references
+
+- https://github.com/openjdk/jdk7u/blob/jdk7u351-ga/README-builds.html
+- https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md
+- https://cdn.azul.com/zulu/bin/
+- https://www.cygwin.com/install.html
+- https://archive.apache.org/dist/ant/binaries/
+
+**Security:** This is not a fully patched Java 7. Keep it away from untrusted
+code and public services; use a sandboxed legacy game environment.
