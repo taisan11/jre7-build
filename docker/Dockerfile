@@ -16,7 +16,7 @@ RUN printf '%s\n' \
  && apt-get -o Acquire::Check-Valid-Until=false update \
  && apt-get install -y --no-install-recommends \
       openjdk-6-jdk gcc-4.8 g++-4.8 make ant \
-      build-essential zip unzip file ca-certificates \
+      build-essential gawk zip unzip file ca-certificates \
       libfreetype6-dev libfontconfig1-dev libasound2-dev libcups2-dev \
       libx11-dev libxext-dev libxrender-dev libxtst-dev libxi-dev \
       libxrandr-dev libxt-dev \

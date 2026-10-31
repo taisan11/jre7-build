@@ -7,6 +7,7 @@ boot=/usr/lib/jvm/java-6-openjdk-amd64
 
 [[ -f "$src/Makefile" ]] || { echo 'Missing OpenJDK source tree' >&2; exit 1; }
 [[ -x "$boot/bin/javac" ]] || { echo "Missing JDK 6 bootstrap compiler: $boot" >&2; exit 1; }
+[[ -x /usr/bin/gawk ]] || { echo 'Missing required build tool: /usr/bin/gawk (rebuild the toolchain image)' >&2; exit 1; }
 
 # OpenJDK 7's makefiles rely on a controlled, classic build environment.
 export LANG=C LC_ALL=C
