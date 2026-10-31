@@ -102,6 +102,20 @@ try {
     # Microsoft documents this ISO-only unattended install command.
     $sdkProcess = Start-Process -FilePath $setup -ArgumentList '-q', '-params:ADDLOCAL=ALL' -Wait -PassThru
     if ($sdkProcess.ExitCode -ne 0) { throw "Windows SDK installer exited $($sdkProcess.ExitCode); see SDK setup logs on the runner" }
+
+    # On modern Windows the bootstrapper can skip both compiler features
+    # (Request: None) while reporting success. Install the ISO's original
+    # compiler packages explicitly and retain verbose Windows Installer logs.
+    $sdkLogDir = Join-Path $work 'logs\sdk-setup'
+    New-Item -ItemType Directory -Force $sdkLogDir | Out-Null
+    foreach ($package in @('vc_stdx86', 'vc_stdamd64')) {
+        $msi = "$($volume.DriveLetter):\Setup\$package\$package.msi"
+        if (-not (Test-Path $msi)) { throw "SDK compiler package missing: $msi" }
+        $msiLog = Join-Path $sdkLogDir "$package.log"
+        Write-Host "Installing SDK compiler package: $package"
+        $msiProcess = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', "`"$msi`"", '/qn', '/norestart', '/l*v', "`"$msiLog`"") -Wait -PassThru
+        if ($msiProcess.ExitCode -ne 0) { throw "SDK compiler package $package exited $($msiProcess.ExitCode); see $msiLog" }
+    }
 } finally {
     if ($mounted) { Dismount-DiskImage -ImagePath $sdkIso | Out-Null }
     # The bootstrapper can exit successfully even when individual components

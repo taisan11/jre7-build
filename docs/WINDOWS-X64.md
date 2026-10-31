@@ -20,8 +20,9 @@ workflow**, so the original Linux builder is not modified or disabled.
   bootstrap. This Java 6 build is never shipped with the output.
 - Installs Cygwin, GNU Make and older **Ant 1.9.16**, which can run on JDK 6.
 - Downloads Microsoft's Windows SDK 7.1 x64 ISO, verifies its published SHA-1,
-  and attempts unattended installation. Uses its MSVC 2010 x64 compiler,
-  verifies its version, and fails rather than falling back to VS2022.
+  and attempts unattended installation, followed by explicit x86 and x64
+  compiler MSI installation (the bootstrapper may skip them). It verifies the
+  MSVC 2010 compiler version and fails rather than falling back to VS2022.
 - Only if a complete `j2sdk-image` exists, runs `SmokeTest.java`, updates JKS
   `cacerts` using the resulting Java 7 `keytool`, and packages JRE/JDK ZIPs.
 
