@@ -1,2 +1,4 @@
-# Cygwin Bash requires LF line endings, including on Windows checkouts.
+# Shell scripts and patches must retain LF on Windows checkouts: the pinned
+# upstream source is cloned with core.autocrlf=false and contains LF lines.
 *.sh text eol=lf
+*.patch text eol=lf
