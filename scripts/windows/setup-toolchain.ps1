@@ -1,5 +1,4 @@
-# Install the *available* part of the Java 7 Windows toolchain on a GitHub-hosted
-# windows-2022 runner. This DOES NOT turn MSVC 2022 into MSVC 2010.
+# Install the legacy Java 7 Windows toolchain on a GitHub-hosted runner.
 [CmdletBinding()]
 param()
 $ErrorActionPreference = 'Stop'
@@ -81,17 +80,39 @@ exec "$bootstrap/bin/java" -cp "$(cygpath -w "$ant_home/lib/ant-launcher.jar")" 
 & $cygBash --noprofile --norc -c 'export PATH=/usr/bin:/bin; set -e; path=$(cygpath -u "$1"); echo "Ant wrapper: $path"; command -v chmod; chmod +x "$path"; ls -l "$path"; if ! test -x "$path"; then echo "Ant wrapper is not executable under Cygwin" >&2; exit 1; fi' -- $antWrapperPath
 if ($LASTEXITCODE -ne 0) { throw 'Failed to enable Cygwin Ant wrapper' }
 
-# Select installed Visual Studio C++ tools; on hosted runners this is VS2022.
-$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
-if (-not (Test-Path $vswhere)) { throw 'vswhere.exe not found' }
-$vsRoot = (& $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1)
-if (-not $vsRoot) { throw 'No Visual Studio C++ tools installed' }
-$vcvars = Join-Path $vsRoot 'VC\Auxiliary\Build\vcvarsall.bat'
-if (-not (Test-Path $vcvars)) { throw "vcvarsall.bat missing: $vcvars" }
-"VCVARSALL=$vcvars" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+# The linked download is Windows SDK 7.1, not the Visual Studio IDE. Its x64
+# ISO includes the VS2010-generation (16.00) compiler and Windows 7.1 SDK.
+# Microsoft's published SHA-1 identifies this historical ISO; it is not a
+# modern security-strength integrity guarantee.
+$sdkIso = Join-Path $work 'GRMSDKX_EN_DVD.iso'
+Download-File 'https://download.microsoft.com/download/F/1/0/F10113F5-B750-4969-A255-274341AC6BCE/GRMSDKX_EN_DVD.iso' $sdkIso
+$expectedSdkSha1 = '9203529F5F70D556A60C37F118A95214E6D10B5A'
+if ((Get-FileHash -Algorithm SHA1 -Path $sdkIso).Hash -ne $expectedSdkSha1) {
+    throw 'Windows SDK 7.1 ISO does not match the SHA-1 published by Microsoft'
+}
+$mounted = $false
+try {
+    Mount-DiskImage -ImagePath $sdkIso -ErrorAction Stop | Out-Null
+    $mounted = $true
+    $volume = Get-DiskImage -ImagePath $sdkIso | Get-Volume
+    if (-not $volume.DriveLetter) { throw 'Windows SDK ISO has no mounted drive letter' }
+    $setup = "$($volume.DriveLetter):\Setup\Setup.exe"
+    if (-not (Test-Path $setup)) { $setup = "$($volume.DriveLetter):\Setup.exe" }
+    if (-not (Test-Path $setup)) { throw 'Windows SDK ISO setup.exe not found' }
+    # Microsoft documents this ISO-only unattended install command.
+    $sdkProcess = Start-Process -FilePath $setup -ArgumentList '-q', '-params:ADDLOCAL=ALL' -Wait -PassThru
+    if ($sdkProcess.ExitCode -ne 0) { throw "Windows SDK installer exited $($sdkProcess.ExitCode); see SDK setup logs on the runner" }
+} finally {
+    if ($mounted) { Dismount-DiskImage -ImagePath $sdkIso | Out-Null }
+}
+$sdkDir = Join-Path ${env:ProgramFiles} 'Microsoft SDKs\Windows\v7.1'
+$setEnv = Join-Path $sdkDir 'Bin\SetEnv.cmd'
+if (-not (Test-Path $setEnv)) { throw "Windows SDK 7.1 SetEnv.cmd missing: $setEnv; SDK installation may have silently failed" }
+"WINDOWSSDKDIR=$sdkDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+"SDK_SETENV=$setEnv" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-Write-Warning 'OpenJDK 7 expects VS2010 (v100); GitHub-hosted Windows 2022 has VS2022 (v143). This is an experimental build attempt, not a proven port.'
+Write-Warning 'Windows SDK 7.1 does not officially support Windows Server 2022; this build remains experimental.'
 Write-Host "Bootstrap JDK: $bootDir"
 Write-Host "Cygwin: $cygRoot"
 Write-Host "Ant 1.9: $antHome"
-Write-Host "MSVC: $vcvars"
+Write-Host "Windows SDK 7.1: $sdkDir"

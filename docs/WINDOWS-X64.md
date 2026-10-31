@@ -19,23 +19,25 @@ workflow**, so the original Linux builder is not modified or disabled.
 - Downloads Azul Zulu JDK **6** (Windows x64 ZIP) strictly as the compiler
   bootstrap. This Java 6 build is never shipped with the output.
 - Installs Cygwin, GNU Make and older **Ant 1.9.16**, which can run on JDK 6.
-- Runs legacy Makefiles with the preinstalled Windows 2022 runner's MSVC x64
-  toolchain, records diagnostic logs, and *fails* if compilation fails.
+- Downloads Microsoft's Windows SDK 7.1 x64 ISO, verifies its published SHA-1,
+  and attempts unattended installation. Uses its MSVC 2010 x64 compiler,
+  verifies its version, and fails rather than falling back to VS2022.
 - Only if a complete `j2sdk-image` exists, runs `SmokeTest.java`, updates JKS
   `cacerts` using the resulting Java 7 `keytool`, and packages JRE/JDK ZIPs.
 
-## Blocking issue: Visual Studio 2010 vs 2022
+## Windows SDK 7.1 limitations
 
-**Upstream Java 7u351 expects MSVC 2010 (v100), but GitHub's `windows-2022`
-runner has MSVC 2022 (v143).** This workflow can execute the build steps on a
-GitHub-hosted runner, but is not known to successfully compile unpatched source.
-The source may need substantial toolchain/backport compatibility patches.
-Do not mistake a valid workflow YAML for a successfully ported Windows JVM.
+The linked Microsoft download is Windows SDK 7.1, not the Visual Studio IDE;
+its x64 ISO includes the VS2010-generation compiler. The SDK does not list
+Windows Server 2022 as supported, and its installer can fail silently or omit
+components. The workflow checks for SetEnv.cmd and compiler version 16.00;
+a successful installation or build on hosted runners is not yet verified.
+Microsoft's published SHA-1 identifies this historical ISO but is not a modern
+security-strength integrity check. Review Microsoft's SDK license before use.
 
-The source may also assume an older DirectX SDK, `make` and MSVC runtime.
-The automated setup does not acquire/provision VS2010 or an old DirectX SDK,
-and it does not redistribute proprietary Microsoft files. If the build fails,
-add only reviewed, legally distributable changes under `patches/build/`.
+The build may also require an older DirectX SDK, GNU make, or MSVC runtime.
+If the build fails, add only reviewed, legally distributable changes under
+`patches/build/`.
 
 The job is deliberately **workflow_dispatch-only** until a complete Windows
 build has been produced and tested; this avoids repeatedly failing every push.
@@ -43,6 +45,8 @@ The existing Linux tag release job still only publishes Linux binaries.
 
 ## Key references
 
+- https://www.microsoft.com/en-us/download/details.aspx?id=8442
+- https://learn.microsoft.com/en-us/troubleshoot/developer/visualstudio/installation/install-windows-sdk-silent-mode
 - https://github.com/openjdk/jdk7u/blob/jdk7u351-ga/README-builds.html
 - https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md
 - https://cdn.azul.com/zulu/bin/

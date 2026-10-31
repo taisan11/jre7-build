@@ -1,8 +1,6 @@
 name: Build legacy OpenJDK 7 (Windows x64 experiment)
 
-# Manually dispatched: the baseline upstream JDK 7 source does not yet build
-# with VS2022 on the GitHub-hosted Windows runner. Do not automatically spend
-# CI minutes or publish a misleading runtime until compatibility is fixed.
+# Manually dispatched: the legacy Windows SDK build remains experimental.
 on:
   workflow_dispatch:
 
@@ -43,11 +41,11 @@ jobs:
           python scripts/cacerts.py --bundle work/cacert.pem --check-only
           if ($LASTEXITCODE -ne 0) { throw 'CA bundle check failed' }
 
-      - name: Install Windows legacy bootstrap / Cygwin / Ant
+      - name: Install Windows SDK 7.1, legacy bootstrap, Cygwin and Ant
         shell: pwsh
         run: ./scripts/windows/setup-toolchain.ps1
 
-      - name: Build OpenJDK 7 Windows x64 (experimental VS2022)
+      - name: Build OpenJDK 7 Windows x64 (experimental SDK 7.1)
         shell: cmd
         env:
           BUILD_JOBS: '2'
