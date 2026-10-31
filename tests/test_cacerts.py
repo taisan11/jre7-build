@@ -20,6 +20,24 @@ class CertBundleTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 cacerts.parse_pem_bundle(path)
 
+    def test_non_ascii_comments_are_ignored(self):
+        pem = b'-----BEGIN CERTIFICATE-----\nAQID\n-----END CERTIFICATE-----'
+        bundle = b'Certificate name: \xc5\x81\n' + pem + b'\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'bundle.pem'
+            path.write_bytes(bundle)
+            certs, fingerprints, digest = cacerts.parse_pem_bundle(path)
+        self.assertEqual(certs, [pem.decode('ascii')])
+        self.assertEqual(fingerprints, [hashlib.sha256(b'\x01\x02\x03').hexdigest()])
+        self.assertEqual(digest, hashlib.sha256(bundle).hexdigest())
+
+    def test_non_ascii_in_certificate_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'bundle.pem'
+            path.write_bytes(b'-----BEGIN CERTIFICATE-----\n\xc5\n-----END CERTIFICATE-----')
+            with self.assertRaises(UnicodeDecodeError):
+                cacerts.parse_pem_bundle(path)
+
     def test_bundle_dedup_detected(self):
         bundle = Path('/etc/ssl/certs/ca-certificates.crt')
         if not bundle.exists():

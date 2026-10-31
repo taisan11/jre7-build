@@ -16,15 +16,16 @@ import subprocess
 import tempfile
 
 CERT_RE = re.compile(
-    r"-----BEGIN CERTIFICATE-----\s+.*?\s+-----END CERTIFICATE-----",
+    rb"-----BEGIN CERTIFICATE-----\s+.*?\s+-----END CERTIFICATE-----",
     re.DOTALL,
 )
 
 
 def parse_pem_bundle(path):
     bundle_bytes = Path(path).read_bytes()
-    text = bundle_bytes.decode("ascii")
-    certs = CERT_RE.findall(text)
+    # Comments and certificate names in the bundle may contain non-ASCII text.
+    # Only PEM blocks need to be ASCII; keep the original bytes for hashing.
+    certs = [cert.decode("ascii") for cert in CERT_RE.findall(bundle_bytes)]
     if not certs:
         raise ValueError("No PEM certificates found")
     fingerprints = []
