@@ -1,0 +1,25 @@
+diff --git a/jdk/make/common/shared/Defs-windows.gmk b/jdk/make/common/shared/Defs-windows.gmk
+--- a/jdk/make/common/shared/Defs-windows.gmk
++++ b/jdk/make/common/shared/Defs-windows.gmk
+@@ -391,6 +391,10 @@
+ ifdef ALT_COMPILER_PATH
+   xALT_COMPILER_PATH  :="$(subst \,/,$(ALT_COMPILER_PATH))"
++  ifdef USING_CYGWIN
++    fxALT_COMPILER_PATH :=$(shell cygpath -m -s $(xALT_COMPILER_PATH) 2> $(DEV_NULL))
++  else
+   fxALT_COMPILER_PATH :=$(call FullPath,$(xALT_COMPILER_PATH))
++  endif
+   COMPILER_PATH       :=$(call PrefixPath,$(fxALT_COMPILER_PATH))
+ else
+   COMPILER_PATH :=$(call PrefixPath,$(_compiler_bin))
+@@ -418,6 +422,10 @@
+ ifdef ALT_MSDEVTOOLS_PATH
+   xALT_MSDEVTOOLS_PATH  :="$(subst \,/,$(ALT_MSDEVTOOLS_PATH))"
++  ifdef USING_CYGWIN
++    fxALT_MSDEVTOOLS_PATH :=$(shell cygpath -m -s $(xALT_MSDEVTOOLS_PATH) 2> $(DEV_NULL))
++  else
+   fxALT_MSDEVTOOLS_PATH :=$(call FullPath,$(xALT_MSDEVTOOLS_PATH))
++  endif
+   MSDEVTOOLS_PATH       :=$(call PrefixPath,$(fxALT_MSDEVTOOLS_PATH))
+ else
+   ifeq ($(ARCH_DATA_MODEL), 64)
