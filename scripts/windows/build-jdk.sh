@@ -16,6 +16,15 @@ boot_dir="$(cygpath -m "$BOOT_JDK_DIR")"
 export ALT_BOOTDIR="$boot_dir"
 export ALT_JDK_IMPORT_PATH="$boot_dir"
 export ANT_HOME="$(cygpath -m "$LEGACY_ANT_HOME")"
+# SetEnv.cmd can change the Windows environment variable's capitalization.
+# Cygwin and GNU make treat it case-sensitively, so export the exact spelling
+# expected by OpenJDK, using a space-free path for make recipes.
+sdk_dir="$(dirname "$(dirname "$(cygpath -u "$SDK_SETENV")")")"
+export WINDOWSSDKDIR="$(cygpath -m -s "$sdk_dir")"
+[[ -f "$sdk_dir/Bin/SetEnv.cmd" && "$WINDOWSSDKDIR" != *' '* ]] || {
+  echo 'Windows SDK 7.1 directory is missing or lacks an 8.3 short path' >&2
+  exit 1
+}
 export ARCH_DATA_MODEL=64
 export BUILD_JDK=true
 export HOTSPOT_BUILD_JOBS="${BUILD_JOBS:-2}"
@@ -57,7 +66,7 @@ set -o pipefail
   make --version | head -1
   command -v cl.exe
   cl.exe 2>&1 | head -6 || true
-  echo "SDK-only VS2010 discovery override; compiler: $ALT_COMPILER_PATH; SDK tools: $ALT_MSDEVTOOLS_PATH"
+  echo "SDK-only VS2010 discovery override; SDK: $WINDOWSSDKDIR; compiler: $ALT_COMPILER_PATH; SDK tools: $ALT_MSDEVTOOLS_PATH"
   echo '== Source sanity =='
   test -f work/openjdk/Makefile
   cd work/openjdk
