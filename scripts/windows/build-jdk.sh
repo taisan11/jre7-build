@@ -91,7 +91,10 @@ set -o pipefail
   # Current make / compiler may produce errors; fail instead of shipping fake ZIPs.
   make sanity ALT_BOOTDIR="$ALT_BOOTDIR" ALLOW_DOWNLOADS=false
   echo '== Full native JDK build =='
-  make -j"${BUILD_JOBS:-2}" all ALT_BOOTDIR="$ALT_BOOTDIR" \
+  # Legacy CORBA's 'all' target has an ordering race: classes.jar may be
+  # created before the build target populates corba/classes under make -j2.
+  # Keep the forest build sequential until the upstream dependency is fixed.
+  make -j1 all ALT_BOOTDIR="$ALT_BOOTDIR" \
     HOTSPOT_BUILD_JOBS="$HOTSPOT_BUILD_JOBS" \
     PARALLEL_COMPILE_JOBS="$PARALLEL_COMPILE_JOBS" \
     ALLOW_DOWNLOADS=false
