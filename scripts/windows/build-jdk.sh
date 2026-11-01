@@ -25,9 +25,23 @@ export WINDOWSSDKDIR="$(cygpath -m -s "$sdk_dir")"
   echo 'Windows SDK 7.1 directory is missing or lacks an 8.3 short path' >&2
   exit 1
 }
-export ALT_DXSDK_PATH="$WINDOWSSDKDIR"
-export ALT_FREETYPE_HEADERS_PATH=/usr/include/freetype2
-export ALT_FREETYPE_LIB_PATH=/usr/lib
+# A separate DirectX June 2010 SDK is extracted without installing its
+# incompatible redistributables. Keep paths space-free for legacy GNU make.
+: "$DXSDK_ROOT"
+: "$FT_INSTALL"
+dx_root="$(cygpath -u "$DXSDK_ROOT")"
+ft_root="$(cygpath -u "$FT_INSTALL")"
+export ALT_DXSDK_PATH="$(cygpath -m "$dx_root")"
+export ALT_DXSDK_INCLUDE_PATH="$(cygpath -m "$dx_root/Include")"
+export ALT_DXSDK_LIB_PATH="$(cygpath -m "$dx_root/Lib/x64")"
+export ALT_FREETYPE_HEADERS_PATH="$(cygpath -m "$ft_root/include/freetype2")"
+export ALT_FREETYPE_LIB_PATH="$(cygpath -m "$ft_root/lib")"
+for required in "$dx_root/Include/d3d9.h" "$dx_root/Include/d3dx9.h" \
+                "$dx_root/Lib/x64/d3d9.lib" "$dx_root/Lib/x64/d3dx9.lib" \
+                "$ft_root/include/freetype2/ft2build.h" \
+                "$ft_root/lib/freetype.lib" "$ft_root/lib/freetype.dll"; do
+  [[ -f "$required" ]] || { echo "Required native dependency missing: $required" >&2; exit 1; }
+done
 export ARCH_DATA_MODEL=64
 export BUILD_JDK=true
 export HOTSPOT_BUILD_JOBS="${BUILD_JOBS:-2}"
