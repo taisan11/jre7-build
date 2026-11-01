@@ -60,7 +60,22 @@ export PATH="$repo/work/cygwin-tools:/usr/local/bin:/usr/bin:/bin:${PATH}"
 # IDE. Bypass that IDE discovery and point make at the SDK's actual tools.
 compiler_exe="$(command -v cl.exe)"
 resource_exe="$(command -v rc.exe)"
-export ALT_COMPILER_PATH="$(cygpath -m -s "$(dirname "$compiler_exe")")"
+compiler_dir="$(dirname "$compiler_exe")"
+# HotSpot's NMake makefiles invoke 'link.exe' without an absolute path.
+# Keep the native MSVC bin ahead of Cygwin's /usr/bin (which also contains
+# link.exe, a POSIX hard-link utility), while retaining Cygwin for make/zip/etc.
+[[ -f "$compiler_dir/link.exe" ]] || {
+  echo "MSVC linker missing beside cl.exe: $compiler_dir/link.exe" >&2
+  exit 1
+}
+export PATH="$repo/work/cygwin-tools:$compiler_dir:/usr/local/bin:/usr/bin:/bin:${PATH}"
+hash -r
+linker_exe="$(command -v link.exe)"
+[[ "$linker_exe" == "$compiler_dir/link.exe" ]] || {
+  echo "Expected MSVC link.exe, got: $linker_exe" >&2
+  exit 1
+}
+export ALT_COMPILER_PATH="$(cygpath -m -s "$compiler_dir")"
 export ALT_MSDEVTOOLS_PATH="$(cygpath -m -s "$(dirname "$resource_exe")")"
 [[ "$ALT_COMPILER_PATH" != *' '* && "$ALT_MSDEVTOOLS_PATH" != *' '* ]] || {
   echo 'MSVC or Windows SDK path has spaces and no usable 8.3 short name' >&2
@@ -82,6 +97,8 @@ set -o pipefail
   command -v make
   make --version | head -1
   command -v cl.exe
+  command -v link.exe
+  command -v make
   cl.exe 2>&1 | head -6 || true
   echo "SDK-only VS2010 discovery override; SDK: $WINDOWSSDKDIR; compiler: $ALT_COMPILER_PATH; SDK tools: $ALT_MSDEVTOOLS_PATH"
   echo '== Source sanity =='
