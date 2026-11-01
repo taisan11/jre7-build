@@ -25,6 +25,9 @@ export WINDOWSSDKDIR="$(cygpath -m -s "$sdk_dir")"
   echo 'Windows SDK 7.1 directory is missing or lacks an 8.3 short path' >&2
   exit 1
 }
+export ALT_DXSDK_PATH="$WINDOWSSDKDIR"
+export ALT_FREETYPE_HEADERS_PATH=/usr/include/freetype2
+export ALT_FREETYPE_LIB_PATH=/usr/lib
 export ARCH_DATA_MODEL=64
 export BUILD_JDK=true
 export HOTSPOT_BUILD_JOBS="${BUILD_JOBS:-2}"
