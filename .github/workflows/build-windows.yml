@@ -3,6 +3,10 @@ name: Build legacy OpenJDK 7 (Windows x64 experiment)
 # Manually dispatched: the legacy Windows SDK build remains experimental.
 on:
   workflow_dispatch:
+  # Temporary validation trigger for this fix branch; keep main manual-only.
+  push:
+    branches:
+      - fix/windows-native-deps-20261101
 
 permissions:
   contents: read
@@ -44,6 +48,10 @@ jobs:
       - name: Install Windows SDK 7.1, legacy bootstrap, Cygwin and Ant
         shell: pwsh
         run: ./scripts/windows/setup-toolchain.ps1
+
+      - name: Fetch legacy DirectX SDK and FreeType sources
+        shell: pwsh
+        run: ./scripts/windows/setup-native-deps.ps1
 
       - name: Build OpenJDK 7 Windows x64 (experimental SDK 7.1)
         shell: cmd
