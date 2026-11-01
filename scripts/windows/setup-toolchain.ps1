@@ -54,7 +54,7 @@ $cygArgs = @(
     '--quiet-mode', '--wait', '--no-admin', '--no-desktop', '--no-shortcuts',
     '--only-site', '--site', 'https://mirrors.kernel.org/sourceware/cygwin/',
     '--root', $cygRoot, '--local-package-dir', (Join-Path $work 'cygwin-packages'),
-    '--packages', 'bash,make,zip,unzip,perl,gawk,sed,grep,findutils,coreutils,which,patch,diffutils,tar'
+    '--packages', 'bash,make,zip,unzip,perl,gawk,sed,grep,findutils,coreutils,which,patch,diffutils,tar,cpio,m4,libfreetype-devel'
 )
 $proc = Start-Process -FilePath $cygInstaller -ArgumentList $cygArgs -Wait -PassThru -NoNewWindow
 if ($proc.ExitCode -ne 0) { throw "Cygwin installer exited $($proc.ExitCode)" }
