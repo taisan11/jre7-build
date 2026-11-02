@@ -7,7 +7,7 @@ Mozilla root CA bundle.
 > **Important:** This is an unverified CI build template, not a completed or
 > supported Java 7 distribution. Its GitHub Actions build has not been run.
 > Updating the CA store does **not** fix Java 7 security vulnerabilities.
-> No security backports are bundled yet. Do not treat artifacts as suitable
+> A certificate blacklist refresh and TLS security-policy hardening patch are bundled, but no CVE implementation fixes have been backported. Do not treat artifacts as suitable
 > for untrusted code or security-sensitive production applications.
 
 ## Quick start
@@ -39,7 +39,7 @@ scripts/cacerts.py         Convert curl/Mozilla PEM bundle into Java 7 JKS
 scripts/package.sh         Assemble Linux JRE/JDK and create ZIP files
 scripts/windows/           Cygwin/toolchain setup, Windows build and packaging
 docs/WINDOWS-X64.md        Windows-specific limitations and instructions
-patches/security/          Reviewed security backports (empty initially)
+patches/security/          Certificate blacklist + TLS policy hardening patch
 patches/build/             Toolchain compatibility patches (empty initially)
 docs/SECURITY-TRACKING.md  Backport tracking checklist
 tests/                     Unit tests and Java 7 runtime smoke test
@@ -85,9 +85,9 @@ updating root CAs does not remove vulnerable crypto protocol implementations.
 Test HTTPS with the target games; do not disable certificate verification to
 work around errors.
 
-To add an audited backport, place a `*.patch` under `patches/security/` and
+A pinned certificate blacklist refresh and TLS policy hardening are applied during compilation on Linux and Windows (see [security tracking](docs/SECURITY-TRACKING.md)). To add another audited backport, place a `*.patch` under `patches/security/` and
 update `docs/SECURITY-TRACKING.md`. Patches are applied in lexicographic order
-before compilation. This template deliberately includes no claimed CVE fixes.
+before compilation. The bundled configuration patch is not a CVE implementation backport and does not make Java 7 safe for untrusted workloads.
 
 ## Failure modes / current limitations
 
