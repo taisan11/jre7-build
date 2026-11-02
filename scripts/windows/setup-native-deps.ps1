@@ -11,8 +11,12 @@ $downloads = Join-Path $work 'native-downloads'
 New-Item -ItemType Directory -Force -Path $downloads | Out-Null
 
 function Download-Checked([string] $Url, [string] $Path, [int64] $MinBytes) {
-    Write-Host "Downloading $Url"
-    Invoke-WebRequest -Uri $Url -OutFile $Path -MaximumRedirection 5
+    if ((Test-Path $Path) -and (Get-Item $Path).Length -ge $MinBytes) {
+        Write-Host "Reusing cached native dependency: $Path"
+    } else {
+        Write-Host "Downloading $Url"
+        Invoke-WebRequest -Uri $Url -OutFile $Path -MaximumRedirection 5
+    }
     if (-not (Test-Path $Path) -or (Get-Item $Path).Length -lt $MinBytes) {
         throw "Native dependency download was missing/truncated: $Url"
     }
