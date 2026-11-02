@@ -116,8 +116,10 @@ jobs:
             built="work/openjdk/$(cat out/jdk-image-path.txt)"
             test -x "$built/bin/java"
             test -x "$built/bin/javac"
-            mkdir -p "$(dirname "$image")"
-            cp -a "$built" "$image"
+            # Docker builds as root; only create the cache staging directory
+            # with the runner's ownership (no full build-tree chown needed).
+            sudo install -d -o "$(id -u)" -g "$(id -g)" "$(dirname "$image")"
+            cp -a --no-preserve=ownership "$built" "$image"
           fi
           test -x "$image/bin/java"
           test -x "$image/bin/javac"
@@ -219,8 +221,8 @@ jobs:
         shell: pwsh
         run: ./scripts/windows/setup-native-deps.ps1
 
-      - name: Save Windows toolchain downloads
-        if: steps.windows-image.outputs.cache-hit != 'true' && steps.windows-downloads.outputs.cache-hit != 'true'
+      - name: Save Windows toolchain downloads (including partial downloads)
+        if: ${{ always() && steps.windows-image.outputs.cache-hit != 'true' && steps.windows-downloads.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: |

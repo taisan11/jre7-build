@@ -53,7 +53,45 @@ if (-not (Test-Path (Join-Path $antHome 'lib\ant-launcher.jar'))) {
 # Cygwin verifies downloaded package metadata by default; DO NOT --no-verify.
 $cygRoot = Join-Path $work 'cygwin64'
 $cygInstaller = Join-Path $work 'setup-x86_64.exe'
-Download-File 'https://cygwin.com/setup-x86_64.exe' $cygInstaller
+
+# Pinned Cygwin setup 2.941; official upstream SHA-512 from
+# https://cygwin.com/setup/sha512.sum (not a mutable "latest" binary).
+$cygwinSha512 = '9BBBD4DE497842446AF58AF875590ACE5D8FA3C557CD7E27328569DFA68E58213DA1CC1A6FB7102D4F0F01BE38E0B92C6FA74F61B6EB7351A0481CA4BD9E8781'
+if ((Test-Path $cygInstaller) -and
+    ((Get-FileHash $cygInstaller -Algorithm SHA512).Hash -eq $cygwinSha512)) {
+    Write-Host "Reusing verified cached Cygwin installer: $cygInstaller"
+} else {
+    # The original unversioned cygwin.com redirect refused connections on CI.
+    # Retry the pinned official archive using several Cygwin/Sourceware hosts.
+    $cygwinUrls = @(
+        'https://cygwin.com/setup/setup-2.941.x86_64.exe',
+        'https://www.cygwin.com/setup/setup-2.941.x86_64.exe',
+        'https://cygwin.org/setup/setup-2.941.x86_64.exe',
+        'https://www.sourceware.org/cygwin/setup-x86_64.exe'
+    )
+    $downloaded = $false
+    foreach ($url in $cygwinUrls) {
+        for ($attempt = 1; $attempt -le 2; $attempt++) {
+            try {
+                Write-Host "Downloading Cygwin installer from $url (attempt $attempt/2)"
+                Invoke-WebRequest -Uri $url -OutFile $cygInstaller -MaximumRedirection 5 -TimeoutSec 90 -ErrorAction Stop
+                if ((Get-FileHash $cygInstaller -Algorithm SHA512).Hash -ne $cygwinSha512) {
+                    throw "Cygwin installer SHA-512 mismatch for $url"
+                }
+                $downloaded = $true
+                break
+            } catch {
+                Write-Warning "Cygwin setup download failed: $($_.Exception.Message)"
+                Remove-Item $cygInstaller -Force -ErrorAction SilentlyContinue
+                if ($attempt -lt 2) { Start-Sleep -Seconds 3 }
+            }
+        }
+        if ($downloaded) { break }
+    }
+    if (-not $downloaded) {
+        throw 'All verified official Cygwin installer downloads failed'
+    }
+}
 $cygArgs = @(
     '--quiet-mode', '--wait', '--no-admin', '--no-desktop', '--no-shortcuts',
     '--only-site', '--site', 'https://mirrors.kernel.org/sourceware/cygwin/',
