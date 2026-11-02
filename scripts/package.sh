@@ -29,6 +29,10 @@ jdk="$(realpath -m "$src/$jdk_relative")"
 
 jre_name=legacy-openjdk7u351-linux-x64-jre
 jdk_name=legacy-openjdk7u351-linux-x64-jdk
+security_smoke_classes="$out/security-smoke-classes"
+mkdir -p "$security_smoke_classes"
+"$jdk/bin/javac" -source 7 -target 7 -d "$security_smoke_classes" tests/SecuritySmokeTest.java
+
 stage="$out/stage"
 rm -rf "$stage"
 mkdir -p "$stage/$jre_name" "$stage/$jdk_name"
@@ -52,6 +56,7 @@ for name in "$jre_name" "$jdk_name"; do
     --keystore "$keystore" --metadata "$root/CA-METADATA.json"
 
   "$root/bin/java" -version
+  "$root/bin/java" -cp "$security_smoke_classes" SecuritySmokeTest
 
   cp "$src/LICENSE" "$root/OPENJDK-SOURCE-LICENSE.txt"
   [[ ! -f "$src/THIRD_PARTY_README" ]] || cp "$src/THIRD_PARTY_README" "$root/OPENJDK-THIRD-PARTY-README.txt"

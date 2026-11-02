@@ -24,6 +24,10 @@ $sha = (Get-FileHash -Path $bundle -Algorithm SHA256).Hash.ToLowerInvariant()
 $upstreamCommit = (Get-Content (Join-Path $work 'upstream-commit.txt') -Raw).Trim()
 $patchLog = (Join-Path $work 'applied-patches.txt')
 $patches = if (Test-Path $patchLog) { @(Get-Content $patchLog) } else { @() }
+$securitySmokeDir = Join-Path $work 'security-smoke-classes'
+New-Item -ItemType Directory -Force $securitySmokeDir | Out-Null
+& (Join-Path $jdk 'bin\javac.exe') -source 7 -target 7 -d $securitySmokeDir (Join-Path $root 'tests\SecuritySmokeTest.java')
+if ($LASTEXITCODE -ne 0) { throw 'Security smoke test compilation failed' }
 
 foreach ($kind in @('jre', 'jdk')) {
     $name = "$base-$kind"
@@ -40,6 +44,8 @@ foreach ($kind in @('jre', 'jdk')) {
     if ($LASTEXITCODE -ne 0) { throw "CA import failed: $kind" }
     & (Join-Path $dest 'bin\java.exe') -version
     if ($LASTEXITCODE -ne 0) { throw "Java 7 launch failed: $kind" }
+    & (Join-Path $dest 'bin\java.exe') -cp $securitySmokeDir SecuritySmokeTest
+    if ($LASTEXITCODE -ne 0) { throw "Java 7 security smoke test failed: $kind" }
     $license = Join-Path $root 'work\openjdk\LICENSE'
     if (Test-Path $license) { Copy-Item $license (Join-Path $dest 'OPENJDK-SOURCE-LICENSE.txt') }
     $thirdParty = Join-Path $root 'work\openjdk\THIRD_PARTY_README'
