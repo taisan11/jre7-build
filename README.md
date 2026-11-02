@@ -1,8 +1,7 @@
-# Legacy OpenJDK 7 builder (experimental)
+# OpenJDK 7 Build
 
-Build **OpenJDK 7u351** from publicly available source on GitHub Actions and
-package legacy-game-friendly **Linux x86_64 JRE and JDK ZIPs**, with a separate **experimental Windows x64 build workflow**, and an updated
-Mozilla root CA bundle.
+Github Actionsを用いて`OpenJDK 7u351`をビルドして提供しています。
+最新のMozzila提供のものを使用した証明書のアップデート、その他一部Securityのパッチ等を行っています。
 
 > **Important:** This is an unverified CI build template, not a completed or
 > supported Java 7 distribution. Its GitHub Actions build has not been run.
