@@ -1,47 +1,67 @@
 # OpenJDK 7 Build
 
-Github Actionsを用いて`OpenJDK 7u351`をビルドして提供しています。
-最新のMozzila提供のものを使用した証明書のアップデート、その他一部Securityのパッチ等を行っています。
+GitHub Actionsを用いて`OpenJDK 7u351`をビルドして提供しています。
+最新のMozilla提供の証明書を反映し、一部のSecurityパッチを適用しています。
+Linux x86_64・Windows x64向けのフルJRE/JDK ZIPを生成します。
 
-> **Important:** This is an unverified CI build template, not a completed or
-> supported Java 7 distribution. Its GitHub Actions build has not been run.
-> Updating the CA store does **not** fix Java 7 security vulnerabilities.
-> A certificate blacklist refresh and TLS security-policy hardening patch are bundled, but no CVE implementation fixes have been backported. Do not treat artifacts as suitable
-> for untrusted code or security-sensitive production applications.
+> **Security:** This project is an experimental community build of legacy
+> Java 7, not a fully security-patched or vendor-supported runtime. The
+> certificate blacklist / TLS policy changes do not backport all CVE fixes.
+> Do not use it to run untrusted code or security-sensitive services.
 
-## Quick start
+## Run a full release build
 
-1. Create an empty GitHub repository (default branch `main`).
-2. Copy/push the contents of this folder to the repository.
-3. For Linux, open **Actions → Build legacy OpenJDK 7 → Run workflow**.
-   For Windows x64, open **Actions → Build legacy OpenJDK 7 (Windows x64 experiment) → Run workflow** (see [Windows build guide](docs/WINDOWS-X64.md)).
-4. After a successful run, download the `legacy-openjdk7u351-linux-x64`
-   artifact (contains the JRE/JDK ZIPs and SHA-256 checksums).
-5. Optionally push a `v0.1.0` tag to publish the archives under **Releases**.
+Open **Actions → Full Release Build (OpenJDK 7u351) → Run workflow**.
+There are exactly two optional publication controls:
 
-**The Linux workflow is unchanged.** The new Windows x64 job is manual and experimental:
-upstream Java 7 expects VS2010 whereas the GitHub-hosted runner has VS2022.
-Windows compilation is **not verified and is likely to fail without substantial
-source compatibility patches**. Failed jobs upload diagnostics rather than
-pretending to create Windows binaries.
+- **Publish to the GitHub Releases tab**: checkbox, off by default.
+- **Release tag**: text field, needed only when the checkbox is enabled
+  (for example `v7u351-20261102`). The workflow validates the tag first.
+
+Every run builds and smoke-tests **both OS targets and both JRE/JDK packages**.
+The four ZIP archives and their SHA-256 files are always available as Actions
+artifacts for 30 days. When publishing is enabled, the workflow **waits for
+both jobs to succeed**, verifies all four checksums, and creates a GitHub
+Release using the supplied tag at the commit that was built. It refuses to
+overwrite an existing release or to reuse a tag pointing elsewhere.
+
+A full build is never published when only one platform succeeds. Release
+publishing is not triggered automatically by a tag push.
+
+## Build acceleration / cache
+
+- Each platform caches only the **completed JDK release image**. A hit skips
+  the old toolchain installation and native compilation, but source/patch
+  checkout, fresh CA download, runtime/security tests, packaging and checksum
+  generation still run.
+- Keys are separated by OS and derived from the pinned upstream version,
+  build scripts and patches. Changing any build input invalidates the compiled
+  image. Tests and downloaded roots do not unnecessarily invalidate it.
+- Linux also reuses its Buildx GitHub Actions cache for the old Ubuntu 14.04
+  toolchain Docker image on a compiled-image miss.
+- Windows caches downloads of the legacy Windows SDK 7.1, DirectX SDK, JDK 6
+  bootstrap, Ant, CMake, FreeType and Cygwin packages on a compiled-image
+  miss. SDK and DirectX downloads are checked against their pinned digests.
+- GitHub caches are scoped to branches, subject to the GitHub Actions cache
+  retention / storage limits. A cache miss always performs a **full native
+  release build**, not an incremental or reduced build.
 
 ## File layout
 
 ```text
-.github/workflows/build.yml  Existing Linux build, test, artifact, release
-.github/workflows/build-windows.yml  Windows-hosted experimental native build
-Dockerfile (under docker/) Ubuntu 14.04 build toolchain
-scripts/fetch-source.sh    Clone pinned source ref
-scripts/apply-patches.sh   Apply reviewed patch files before building
-docker/build-jdk.sh        Native OpenJDK build in isolated container
-scripts/cacerts.py         Convert curl/Mozilla PEM bundle into Java 7 JKS
-scripts/package.sh         Assemble Linux JRE/JDK and create ZIP files
-scripts/windows/           Cygwin/toolchain setup, Windows build and packaging
-docs/WINDOWS-X64.md        Windows-specific limitations and instructions
-patches/security/          Certificate blacklist + TLS policy hardening patch
-patches/build/             Toolchain compatibility patches (empty initially)
-docs/SECURITY-TRACKING.md  Backport tracking checklist
-tests/                     Unit tests and Java 7 runtime smoke test
+.github/workflows/build.yml  Only Actions workflow; full Linux/Windows build and optional release
+docker/                       Ubuntu 14.04 legacy Linux build toolchain
+scripts/fetch-source.sh       Clone pinned source ref
+scripts/apply-patches.sh      Apply audited patches before building
+docker/build-jdk.sh           Linux native JDK compilation and smoke test
+scripts/cacerts.py            Generate compatible Java 7 JKS from Mozilla PEM
+scripts/package.sh            Linux JRE/JDK packaging and SHA-256
+scripts/windows/              Windows setup, native build and packaging
+docs/WINDOWS-X64.md           Windows compiler details and limitations
+patches/security/             Certificate blacklist and TLS policy patches
+patches/build/                Toolchain compatibility patches
+docs/SECURITY-TRACKING.md     Security backport tracking
+tests/                       Python and Java smoke tests
 ```
 
 ## Source and toolchain
@@ -94,8 +114,7 @@ before compilation. The bundled configuration patch is not a CVE implementation 
   unavailable, and `ubuntu:14.04` can stop being published.
 - Upstream build rules / newer host kernels can require additional patches.
 - GitHub-hosted Actions resources may be insufficient for some native builds.
-- Linux x86_64 remains the only *previously configured* native target. An experimental Windows x64 workflow has been added; macOS and 32-bit builds are not configured.
-- The ZIPs and `cacerts` processing were **not** exercised against a real
-  completed 7u351 build in this environment; a CI run is required to validate.
+- Linux x86_64 and Windows x64 are configured as full native build targets. macOS and 32-bit builds are not configured.
+- A successful Windows native workflow run exists, but Linux and both release archives must still be validated by the combined workflow before distribution.
 - No reproducibility or binary signatures are guaranteed; consider pinning the
   container digest and CA bundle revision when moving beyond experiments.

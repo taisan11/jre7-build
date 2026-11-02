@@ -9,8 +9,12 @@ $work = Join-Path $root 'work'
 New-Item -ItemType Directory -Force -Path $work, (Join-Path $work 'logs') | Out-Null
 
 function Download-File([string] $Url, [string] $Path) {
-    Write-Host "Downloading $Url"
-    Invoke-WebRequest -Uri $Url -OutFile $Path -MaximumRedirection 5
+    if ((Test-Path $Path) -and (Get-Item $Path).Length -ge 1000) {
+        Write-Host "Reusing cached download: $Path"
+    } else {
+        Write-Host "Downloading $Url"
+        Invoke-WebRequest -Uri $Url -OutFile $Path -MaximumRedirection 5
+    }
     if (-not (Test-Path $Path) -or (Get-Item $Path).Length -lt 1000) {
         throw "Download failed or too small: $Url"
     }

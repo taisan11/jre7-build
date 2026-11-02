@@ -1,47 +1,89 @@
-name: Build legacy OpenJDK 7
+name: Full Release Build (OpenJDK 7u351)
 
+# One manual entry point: always build full Linux and Windows JRE/JDK archives.
 on:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Publish to the GitHub Releases tab'
+        type: boolean
+        required: true
+        default: false
+      release_tag:
+        description: 'Release tag (required only when publishing)'
+        type: string
+        required: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: jre7-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: full-release-build-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
+  validate:
+    name: Validate release options
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Validate release tag before building
+        env:
+          PUBLISH_RELEASE: ${{ inputs.publish_release }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$PUBLISH_RELEASE" == "true" ]]; then
+            if [[ -z "$RELEASE_TAG" ]]; then
+              echo "::error::A release tag is required when publishing is enabled."
+              exit 1
+            fi
+            if [[ "$RELEASE_TAG" == -* ]] || ! git check-ref-format "refs/tags/$RELEASE_TAG"; then
+              echo "::error::Invalid Git release tag: $RELEASE_TAG"
+              exit 1
+            fi
+          fi
+
   linux-x64:
+    name: Full Linux x64 JRE/JDK
+    needs: validate
     runs-on: ubuntu-24.04
     timeout-minutes: 330
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check scripts and metadata
+      - name: Validate builder scripts and tests
+        shell: bash
         run: |
+          set -euo pipefail
           for f in scripts/*.sh docker/*.sh; do bash -n "$f"; done
           python3 -m compileall -q scripts tests
           python3 -m unittest discover -s tests -v
 
-      - name: Clone pinned upstream OpenJDK 7u
-        env:
-          OPENJDK_REF: jdk7u351-ga
+      - name: Fetch pinned OpenJDK source and apply patches
+        shell: bash
         run: |
-          bash scripts/fetch-source.sh "$OPENJDK_REF"
+          set -euo pipefail
+          bash scripts/fetch-source.sh jdk7u351-ga
           bash scripts/apply-patches.sh work/openjdk
 
-      - name: Fetch Mozilla root CA bundle (curl project)
-        run: |
-          mkdir -p work
-          curl --fail --location --show-error --silent --retry 3 \
-            https://curl.se/ca/cacert.pem -o work/cacert.pem
-          sha256sum work/cacert.pem | tee work/cacert.sha256
-          python3 scripts/cacerts.py --bundle work/cacert.pem --check-only
+      # Only cache complete, validated release images, never intermediate build
+      # trees. The key covers all inputs that can alter compiled JDK binaries.
+      # Refreshed Mozilla roots and per-run metadata are added after restore.
+      - name: Restore full Linux JDK image
+        id: linux-image
+        uses: actions/cache/restore@v4
+        with:
+          path: work/openjdk/build/release-image/j2sdk-image
+          key: linux-x64-openjdk7u351-image-v1-${{ hashFiles('patches/**', 'docker/**', 'scripts/fetch-source.sh', 'scripts/apply-patches.sh') }}
 
-      - name: Set up Docker Buildx
+      - name: Configure Docker Buildx
+        if: steps.linux-image.outputs.cache-hit != 'true'
         uses: docker/setup-buildx-action@v3
 
-      - name: Create legacy toolchain image (Ubuntu 14.04 / JDK 6 / GCC 4.8)
+      - name: Build cached Linux toolchain image
+        if: steps.linux-image.outputs.cache-hit != 'true'
         uses: docker/build-push-action@v6
         with:
           context: docker
@@ -51,8 +93,11 @@ jobs:
           cache-from: type=gha,scope=legacy-jdk7-toolchain
           cache-to: type=gha,mode=max,scope=legacy-jdk7-toolchain
 
-      - name: Build JDK 7 and smoke-test VM
+      - name: Compile full Linux OpenJDK and run smoke test (cache miss)
+        if: steps.linux-image.outputs.cache-hit != 'true'
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p out
           docker run --rm \
             --volume "$PWD/work/openjdk:/work/openjdk" \
@@ -62,32 +107,275 @@ jobs:
             legacy-jdk7-build:local \
             /bin/bash /opt/build-jdk.sh
 
-      - name: Assemble JRE and JDK; refresh Java 7 cacerts
+      - name: Prepare complete Linux JDK image
+        shell: bash
         run: |
+          set -euo pipefail
+          image=work/openjdk/build/release-image/j2sdk-image
+          if [[ "${{ steps.linux-image.outputs.cache-hit }}" != "true" ]]; then
+            built="work/openjdk/$(cat out/jdk-image-path.txt)"
+            test -x "$built/bin/java"
+            test -x "$built/bin/javac"
+            mkdir -p "$(dirname "$image")"
+            cp -a "$built" "$image"
+          fi
+          test -x "$image/bin/java"
+          test -x "$image/bin/javac"
+          test -x "$image/jre/bin/java"
+          mkdir -p out
+          echo 'build/release-image/j2sdk-image' > out/jdk-image-path.txt
+
+      - name: Fetch fresh Mozilla CA roots
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work
+          curl --fail --location --show-error --silent --retry 3 https://curl.se/ca/cacert.pem -o work/cacert.pem
+          sha256sum work/cacert.pem | tee work/cacert.sha256
+          python3 scripts/cacerts.py --bundle work/cacert.pem --check-only
+
+      - name: Package full Linux JRE/JDK with refreshed cacerts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out
           bash scripts/package.sh \
             work/openjdk out work/cacert.pem \
-            jdk7u351-ga "${GITHUB_SHA}" "${GITHUB_RUN_ID}" \
-            work/cacert.sha256
-          ls -lah out/*.zip out/*.sha256
+            jdk7u351-ga "$GITHUB_SHA" "$GITHUB_RUN_ID" work/cacert.sha256
+          (cd out && sha256sum -c *.zip.sha256)
+          ls -lah out/*.zip out/*.zip.sha256
 
-      - name: Upload ZIP archives and checksums
+      - name: Save verified Linux JDK image
+        if: steps.linux-image.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: work/openjdk/build/release-image/j2sdk-image
+          key: ${{ steps.linux-image.outputs.cache-primary-key }}
+
+      - name: Upload Linux JRE/JDK archives
         uses: actions/upload-artifact@v4
         with:
           name: legacy-openjdk7u351-linux-x64
           path: |
             out/*.zip
-            out/*.sha256
+            out/*.zip.sha256
           if-no-files-found: error
-          retention-days: 30
           compression-level: 0
+          retention-days: 30
 
-      - name: Publish release for tags only
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          GH_TOKEN: ${{ github.token }}
+  windows-x64:
+    name: Full Windows x64 JRE/JDK
+    needs: validate
+    runs-on: windows-2022
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate builder scripts and tests
+        shell: pwsh
         run: |
-          gh release create "$GITHUB_REF_NAME" out/*.zip out/*.sha256 \
-            --title "Legacy OpenJDK 7u351 - $GITHUB_REF_NAME" \
-            --notes "Community experimental build for legacy applications. Base: OpenJDK 7u351; Mozilla CA bundle refreshed at build time. NOT a fully patched or security-supported Java runtime. Linux x86_64 only."
+          python -m compileall -q scripts tests
+          if ($LASTEXITCODE -ne 0) { throw 'Python compilation failed' }
+          python -m unittest discover -s tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'Python tests failed' }
+
+      - name: Fetch pinned OpenJDK source and apply patches
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/fetch-source.sh jdk7u351-ga
+          bash scripts/apply-patches.sh work/openjdk
+
+      - name: Restore full Windows JDK image
+        id: windows-image
+        uses: actions/cache/restore@v4
+        with:
+          path: work/openjdk/build/release-image/j2sdk-image
+          key: windows-x64-openjdk7u351-image-v1-${{ hashFiles('patches/**', 'scripts/windows/**', 'scripts/fetch-source.sh', 'scripts/apply-patches.sh') }}
+
+      # Legacy installer downloads are reused after an image cache miss.
+      # SDK and DirectX archive digests are checked by the setup scripts.
+      - name: Restore Windows toolchain download cache
+        if: steps.windows-image.outputs.cache-hit != 'true'
+        id: windows-downloads
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            work/GRMSDKX_EN_DVD.iso
+            work/zulu6.22.0.3-ca-jdk6.0.119-win_x64.zip
+            work/apache-ant-1.9.16-bin.zip
+            work/setup-x86_64.exe
+            work/native-downloads
+            work/cygwin-packages
+          key: windows-x64-toolchain-downloads-v1-${{ hashFiles('scripts/windows/setup-toolchain.ps1', 'scripts/windows/setup-native-deps.ps1') }}
+
+      - name: Install legacy SDK, JDK 6 bootstrap, Cygwin and Ant (cache miss)
+        if: steps.windows-image.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: ./scripts/windows/setup-toolchain.ps1
+
+      - name: Fetch DirectX SDK and native FreeType dependencies (cache miss)
+        if: steps.windows-image.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: ./scripts/windows/setup-native-deps.ps1
+
+      - name: Save Windows toolchain downloads
+        if: steps.windows-image.outputs.cache-hit != 'true' && steps.windows-downloads.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            work/GRMSDKX_EN_DVD.iso
+            work/zulu6.22.0.3-ca-jdk6.0.119-win_x64.zip
+            work/apache-ant-1.9.16-bin.zip
+            work/setup-x86_64.exe
+            work/native-downloads
+            work/cygwin-packages
+          key: ${{ steps.windows-downloads.outputs.cache-primary-key }}
+
+      - name: Compile full Windows OpenJDK (cache miss)
+        if: steps.windows-image.outputs.cache-hit != 'true'
+        shell: cmd
+        env:
+          BUILD_JOBS: '1'
+        run: scripts\windows\run-build.cmd
+
+      - name: Prepare complete Windows JDK image
+        shell: pwsh
+        env:
+          IMAGE_CACHE_HIT: ${{ steps.windows-image.outputs.cache-hit }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $image = Join-Path (Resolve-Path 'work/openjdk').Path 'build\release-image\j2sdk-image'
+          if ($env:IMAGE_CACHE_HIT -ne 'true') {
+            $built = (Get-Content 'work/windows-jdk-image.txt' -Raw).Trim()
+            if (-not (Test-Path (Join-Path $built 'bin\javac.exe'))) { throw 'No compiled JDK image found' }
+            New-Item -ItemType Directory -Force -Path (Split-Path $image -Parent) | Out-Null
+            Copy-Item -LiteralPath $built -Destination $image -Recurse -Force
+          }
+          foreach ($required in @('bin\java.exe', 'bin\javac.exe', 'jre\bin\java.exe')) {
+            if (-not (Test-Path (Join-Path $image $required))) { throw "Cached image incomplete: $required" }
+          }
+          Set-Content -Path 'work/windows-jdk-image.txt' -Value $image -Encoding ascii
+
+      - name: Fetch fresh Mozilla CA roots
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri 'https://curl.se/ca/cacert.pem' -OutFile 'work/cacert.pem'
+          $digest = (Get-FileHash 'work/cacert.pem' -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$digest  cacert.pem" | Set-Content -Path 'work/cacert.sha256' -Encoding ascii
+          python scripts/cacerts.py --bundle work/cacert.pem --check-only
+          if ($LASTEXITCODE -ne 0) { throw 'CA bundle check failed' }
+
+      - name: Smoke-test full Windows JDK image
+        shell: pwsh
+        run: |
+          $jdk = (Get-Content 'work/windows-jdk-image.txt' -Raw).Trim()
+          $smokeDir = Join-Path (Resolve-Path 'work').Path 'smoke'
+          New-Item -ItemType Directory -Force $smokeDir | Out-Null
+          & (Join-Path $jdk 'bin\javac.exe') -source 7 -target 7 -d $smokeDir tests/SmokeTest.java
+          if ($LASTEXITCODE -ne 0) { throw 'javac smoke test failed' }
+          & (Join-Path $jdk 'bin\java.exe') '-Djava.awt.headless=true' -cp $smokeDir SmokeTest
+          if ($LASTEXITCODE -ne 0) { throw 'Java 7 smoke test failed' }
+
+      - name: Package full Windows JRE/JDK with refreshed cacerts
+        shell: pwsh
+        run: ./scripts/windows/package.ps1
+
+      - name: Verify Windows SHA256 checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem out/*.zip | ForEach-Object {
+            $actual = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            $expected = ((Get-Content "$($_.FullName).sha256" -Raw).Trim() -split '\s+')[0]
+            if ($actual -ne $expected) { throw "SHA256 mismatch: $($_.Name)" }
+          }
+
+      - name: Save verified Windows JDK image
+        if: steps.windows-image.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: work/openjdk/build/release-image/j2sdk-image
+          key: ${{ steps.windows-image.outputs.cache-primary-key }}
+
+      - name: Upload Windows JRE/JDK archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-openjdk7u351-windows-x64
+          path: |
+            out/legacy-openjdk7u351-windows-x64-*.zip
+            out/legacy-openjdk7u351-windows-x64-*.zip.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload Windows build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-diagnostics
+          path: |
+            work/logs/**
+            work/applied-patches.txt
+            work/upstream-commit.txt
+          if-no-files-found: warn
+          retention-days: 7
+
+  publish:
+    name: Publish complete Linux and Windows release
+    needs: [validate, linux-x64, windows-x64]
+    if: inputs.publish_release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       contents: write
+    steps:
+      - name: Download both completed builds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: legacy-openjdk7u351-*
+          merge-multiple: true
+          path: release-assets
+
+      - name: Require all four archives and verify SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          for platform in linux windows; do
+            for kind in jre jdk; do
+              archive="legacy-openjdk7u351-$platform-x64-$kind.zip"
+              test -s "release-assets/$archive"
+              test -s "release-assets/$archive.sha256"
+            done
+          done
+          (cd release-assets && sha256sum -c *.zip.sha256)
+
+      - name: Publish GitHub Release at the workflow commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "::error::Release $RELEASE_TAG already exists; use a new tag to avoid replacing existing binaries."
+            exit 1
+          fi
+
+          # Never silently publish binaries under an unrelated existing tag.
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" > tag-ref.json 2>/dev/null; then
+            kind="$(jq -r '.object.type' tag-ref.json)"
+            sha="$(jq -r '.object.sha' tag-ref.json)"
+            if [[ "$kind" == "tag" ]]; then
+              sha="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq '.object.sha')"
+            fi
+            if [[ "$sha" != "$GITHUB_SHA" ]]; then
+              echo "::error::Existing tag $RELEASE_TAG points to $sha, not this workflow commit $GITHUB_SHA."
+              exit 1
+            fi
+          fi
+
+          gh release create "$RELEASE_TAG" \
+            release-assets/*.zip release-assets/*.zip.sha256 \
+            --target "$GITHUB_SHA" \
+            --title "Legacy OpenJDK 7u351 - $RELEASE_TAG" \
+            --notes "Full community build: Linux x64 and Windows x64 JRE/JDK archives with refreshed Mozilla CA roots and SHA-256 checksums. Experimental legacy Java 7; NOT fully security-patched or suitable for untrusted code."
