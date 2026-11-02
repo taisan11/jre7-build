@@ -30,9 +30,16 @@ available in the workflow's Artifacts section.
 
 The Windows compiler installation is not persisted in the GitHub Actions
 cache, because Windows runner system installations must be recreated. The
-download cache avoids repeated large downloads after a compiled-image miss.
-Both the legacy Windows SDK ISO and DirectX SDK downloads are checked against
-pinned digests; cached inputs are not exempt from those checks.
+download cache avoids repeated large downloads after a compiled-image miss,
+and saves available downloads even if a later toolchain setup step fails.
+Cygwin setup 2.941 is pinned to its official SHA-512 and downloaded with bounded
+retries and alternate official hosts. The legacy Windows SDK ISO and DirectX
+SDK downloads are checked against pinned digests; cached inputs are not exempt
+from those checks.
+
+Linux compilation in Docker creates root-owned source build directories.
+The release image staging directory is instead created with runner ownership
+and the compiled JDK is copied without preserving root ownership.
 
 ## Limitations
 
