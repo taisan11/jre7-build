@@ -25,6 +25,9 @@ if errorlevel 1 (
   where cl.exe
   exit /b 2
 )
+REM Build a matching native FreeType DLL/import library with MSVC 2010.
+call scripts\windows\build-freetype.cmd
+if errorlevel 1 exit /b %ERRORLEVEL%
 set "PATH=%CYGWIN_ROOT%\bin;%PATH%"
 "%CYGWIN_ROOT%\bin\bash.exe" --noprofile --norc scripts/windows/build-jdk.sh
 exit /b %ERRORLEVEL%

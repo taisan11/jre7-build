@@ -3,6 +3,10 @@ name: Build legacy OpenJDK 7 (Windows x64 experiment)
 # Manually dispatched: the legacy Windows SDK build remains experimental.
 on:
   workflow_dispatch:
+  # Temporary validation trigger for this fix branch; keep main manual-only.
+  push:
+    branches:
+      - fix/windows-native-deps-20261101
 
 permissions:
   contents: read
@@ -45,10 +49,14 @@ jobs:
         shell: pwsh
         run: ./scripts/windows/setup-toolchain.ps1
 
+      - name: Fetch legacy DirectX SDK and FreeType sources
+        shell: pwsh
+        run: ./scripts/windows/setup-native-deps.ps1
+
       - name: Build OpenJDK 7 Windows x64 (experimental SDK 7.1)
         shell: cmd
         env:
-          BUILD_JOBS: '2'
+          BUILD_JOBS: '1'
         run: scripts\windows\run-build.cmd
 
       - name: Smoke test completed JDK image
@@ -59,7 +67,8 @@ jobs:
           New-Item -ItemType Directory -Force $smokeDir | Out-Null
           & (Join-Path $jdk 'bin\javac.exe') -source 7 -target 7 -d $smokeDir tests/SmokeTest.java
           if ($LASTEXITCODE -ne 0) { throw 'javac smoke test failed' }
-          & (Join-Path $jdk 'bin\java.exe') -Djava.awt.headless=true -cp $smokeDir SmokeTest
+          # PowerShell may split unquoted native -Dname.with.dots=value into two arguments.
+          & (Join-Path $jdk 'bin\java.exe') '-Djava.awt.headless=true' -cp $smokeDir SmokeTest
           if ($LASTEXITCODE -ne 0) { throw 'Java 7 smoke test failed' }
 
       - name: Create Windows JRE / JDK ZIP and JKS cacerts
