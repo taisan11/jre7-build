@@ -131,40 +131,64 @@ diff --git a/jdk/src/share/lib/security/blacklisted.certs b/jdk/src/share/lib/se
 diff --git a/jdk/src/share/lib/security/java.security-linux b/jdk/src/share/lib/security/java.security-linux
 --- a/jdk/src/share/lib/security/java.security-linux
 +++ b/jdk/src/share/lib/security/java.security-linux
-@@ -584,3 +584,3 @@
+@@ -581,9 +581,9 @@
+ #
+ # Example:
+ #   jdk.tls.disabledAlgorithms=MD5, SSLv3, DSA, RSA keySize < 2048
 -jdk.tls.disabledAlgorithms=SSLv3, TLSv1, TLSv1.1, DES, MD5withRSA, \
 -    DH keySize < 1024, EC keySize < 224, RC4_40, 3DES_EDE_CBC, anon, NULL, \
 -    include jdk.disabled.namedCurves
 +jdk.tls.disabledAlgorithms=SSLv3, TLSv1, TLSv1.1, DES, MD5withRSA, \
 +    DH keySize < 1024, EC keySize < 224, RC4, 3DES_EDE_CBC, anon, NULL, \
 +    ECDH, include jdk.disabled.namedCurves
+ 
+ # Legacy algorithms for Secure Socket Layer/Transport Layer Security (SSL/TLS)
+ # processing in JSSE implementation.
 diff --git a/jdk/src/share/lib/security/java.security-windows b/jdk/src/share/lib/security/java.security-windows
 --- a/jdk/src/share/lib/security/java.security-windows
 +++ b/jdk/src/share/lib/security/java.security-windows
-@@ -589,3 +589,3 @@
+@@ -586,9 +586,9 @@
+ #
+ # Example:
+ #   jdk.tls.disabledAlgorithms=MD5, SSLv3, DSA, RSA keySize < 2048
 -jdk.tls.disabledAlgorithms=SSLv3, TLSv1, TLSv1.1, DES, MD5withRSA, \
 -    DH keySize < 1024, EC keySize < 224, RC4_40, 3DES_EDE_CBC, anon, NULL, \
 -    include jdk.disabled.namedCurves
 +jdk.tls.disabledAlgorithms=SSLv3, TLSv1, TLSv1.1, DES, MD5withRSA, \
 +    DH keySize < 1024, EC keySize < 224, RC4, 3DES_EDE_CBC, anon, NULL, \
 +    ECDH, include jdk.disabled.namedCurves
+ 
+ # Legacy algorithms for Secure Socket Layer/Transport Layer Security (SSL/TLS)
+ # processing in JSSE implementation.
 diff --git a/jdk/src/share/lib/security/java.security-macosx b/jdk/src/share/lib/security/java.security-macosx
 --- a/jdk/src/share/lib/security/java.security-macosx
 +++ b/jdk/src/share/lib/security/java.security-macosx
-@@ -589,3 +589,3 @@
+@@ -586,9 +586,9 @@
+ #
+ # Example:
+ #   jdk.tls.disabledAlgorithms=MD5, SSLv3, DSA, RSA keySize < 2048
 -jdk.tls.disabledAlgorithms=SSLv3, TLSv1, TLSv1.1, DES, MD5withRSA, \
 -    DH keySize < 1024, EC keySize < 224, RC4_40, 3DES_EDE_CBC, anon, NULL, \
 -    include jdk.disabled.namedCurves
 +jdk.tls.disabledAlgorithms=SSLv3, TLSv1, TLSv1.1, DES, MD5withRSA, \
 +    DH keySize < 1024, EC keySize < 224, RC4, 3DES_EDE_CBC, anon, NULL, \
 +    ECDH, include jdk.disabled.namedCurves
+ 
+ # Legacy algorithms for Secure Socket Layer/Transport Layer Security (SSL/TLS)
+ # processing in JSSE implementation.
 diff --git a/jdk/src/share/lib/security/java.security-solaris b/jdk/src/share/lib/security/java.security-solaris
 --- a/jdk/src/share/lib/security/java.security-solaris
 +++ b/jdk/src/share/lib/security/java.security-solaris
-@@ -588,3 +588,3 @@
+@@ -585,9 +585,9 @@
+ #
+ # Example:
+ #   jdk.tls.disabledAlgorithms=MD5, SSLv3, DSA, RSA keySize < 2048
 -jdk.tls.disabledAlgorithms=SSLv3, TLSv1, TLSv1.1, DES, MD5withRSA, \
 -    DH keySize < 1024, EC keySize < 224, RC4_40, 3DES_EDE_CBC, anon, NULL, \
 -    include jdk.disabled.namedCurves
 +jdk.tls.disabledAlgorithms=SSLv3, TLSv1, TLSv1.1, DES, MD5withRSA, \
 +    DH keySize < 1024, EC keySize < 224, RC4, 3DES_EDE_CBC, anon, NULL, \
 +    ECDH, include jdk.disabled.namedCurves
+ 
+ # Legacy algorithms for Secure Socket Layer/Transport Layer Security (SSL/TLS)
+ # processing in JSSE implementation.
