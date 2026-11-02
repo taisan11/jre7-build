@@ -45,6 +45,8 @@ class PackagePathTests(unittest.TestCase):
     def test_source_relative_path_is_resolved_on_host(self):
         image = self.src / 'build' / 'linux-amd64' / 'j2sdk-image'
         self.executable(image / 'bin' / 'keytool', 'exit 0')
+        # Packaging now compiles SecuritySmokeTest using the built JDK.
+        self.executable(image / 'bin' / 'javac', 'exit 0')
         self.executable(image / 'bin' / 'java', 'exit 0')
         self.executable(image / 'jre' / 'bin' / 'java', 'exit 0')
         result = self.run_package('build/linux-amd64/j2sdk-image')
