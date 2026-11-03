@@ -37,9 +37,13 @@ retries and alternate official hosts. The legacy Windows SDK ISO and DirectX
 SDK downloads are checked against pinned digests; cached inputs are not exempt
 from those checks.
 
-Linux compilation in Docker creates root-owned source build directories.
-The release image staging directory is instead created with runner ownership
-and the compiled JDK is copied without preserving root ownership.
+Linux compilation in Docker creates root-owned source build directories
+and writes `out/jdk-image-path.txt` as root. After a successful Docker build,
+the workflow returns ownership of `out/` to the Actions runner, creates
+the JDK cache staging directory with runner ownership, and copies the compiled
+JDK without preserving root ownership. The completed, smoke-tested image
+is cached before the per-run CA refresh and JRE/JDK packaging, so packaging
+failures do not force a fresh compilation.
 
 ## Limitations
 
