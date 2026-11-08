@@ -161,6 +161,14 @@ jobs:
           (cd out && sha256sum -c *.zip.sha256)
           ls -lah out/*.zip out/*.zip.sha256
 
+      - name: Verify packaged Linux JRE/JDK contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/verify_archives.py \
+            out/legacy-openjdk7u351-linux-x64-jre.zip \
+            out/legacy-openjdk7u351-linux-x64-jdk.zip
+
       - name: Upload Linux JRE/JDK archives
         uses: actions/upload-artifact@v4
         with:
@@ -298,6 +306,12 @@ jobs:
             $expected = ((Get-Content "$($_.FullName).sha256" -Raw).Trim() -split '\s+')[0]
             if ($actual -ne $expected) { throw "SHA256 mismatch: $($_.Name)" }
           }
+
+      - name: Verify packaged Windows JRE/JDK contents
+        shell: pwsh
+        run: |
+          python scripts/verify_archives.py out/legacy-openjdk7u351-windows-x64-jre.zip out/legacy-openjdk7u351-windows-x64-jdk.zip
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged JRE/JDK validation failed' }
 
       - name: Save verified Windows JDK image
         if: steps.windows-image.outputs.cache-hit != 'true'
