@@ -28,6 +28,20 @@ overwrite an existing release or to reuse a tag pointing elsewhere.
 A full build is never published when only one platform succeeds. Release
 publishing is not triggered automatically by a tag push.
 
+## Finding `javac`
+
+The `*-jre.zip` archives are runtime-only and do **not** contain `javac`.
+For compiling Java source, download the matching **`*-jdk.zip`** archive.
+
+- Windows: extract `legacy-openjdk7u351-windows-x64-jdk.zip` and run
+  `legacy-openjdk7u351-windows-x64-jdk\bin\javac.exe -version`.
+  Add that JDK's `bin` directory to `PATH` if you want to invoke `javac` globally.
+- Linux: extract `legacy-openjdk7u351-linux-x64-jdk.zip` and run
+  `legacy-openjdk7u351-linux-x64-jdk/bin/javac -version`.
+
+The release workflow checks the finished ZIP entries for the JDK compiler,
+`lib/tools.jar`, the Java launcher, and the `cacerts` bundle before upload.
+
 ## Build acceleration / cache
 
 - Each platform caches only the **completed JDK release image**. A hit skips
